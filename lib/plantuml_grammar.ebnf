@@ -1,0 +1,33 @@
+start: "@startuml" title? (entity | relationship)* "@enduml"
+
+title : VARIABLE
+
+entity : package
+       | component
+
+package : "package" name "as" variable body? stereotype?
+component : "component" name "as" variable body? stereotype?
+
+body : "{" entity* "}"
+
+stereotype : "<<" VARIABLE ("/" VARIABLE)* ">>"
+
+relationship : VARIABLE (DEP_USES | DEP_USED_BY) VARIABLE
+
+name : ESCAPED_STRING
+
+variable : VARIABLE
+
+DEP_USES : /-{1,2}>/
+DEP_USED_BY : /<-{1,2}/
+
+VARIABLE : /[A-Za-z0-9-_]+/
+
+COMMENT: "'" /[^\n]/*
+%ignore COMMENT
+
+%import common.ESCAPED_STRING
+%import common.WS
+
+%ignore WS
+
