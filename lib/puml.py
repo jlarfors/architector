@@ -218,24 +218,26 @@ class PumlParser:
             fs_ids.extend(self._get_desc_fs_ids(child))
         return fs_ids
 
-    def _create_rules(self, puml_rels: typing.List[PumlRel]):
+    def _create_rules(self, puml_rels: typing.List[PumlRel]) -> None:
+        """
+        Creates rules from the PlantUML relationships
+        """
         for puml_rel in puml_rels:
-            # print(puml_rel)
+            # puml rules reference puml variables, so get the src and dst puml nodes
             node_src = self.puml_data.var_index[puml_rel.src]
             node_dst = self.puml_data.var_index[puml_rel.dst]
-            # print(node_src.variable, " --> ", node_dst.variable)
-            # print(node_src.id, " --> ", node_dst.id)
-            # for the grouped filesystem ids, make an individual rule
+            # puml nodes will have children and these rules should be inherited
+            # get the src and dst descendents
             fs_ids_src = self._get_desc_fs_ids(node_src)
             fs_ids_dst = self._get_desc_fs_ids(node_dst)
-            # print(fs_ids_src)
-            # print(fs_ids_dst)
-            for x in fs_ids_src:
-                for y in fs_ids_dst:
+            # for all src descendents and all dst descendents, make a rule that the src
+            # can use the dst
+            for fs_src in fs_ids_src:
+                for fs_dst in fs_ids_dst:
                     self.puml_data.rules.append(
                         PumlRule(
-                            src=PumlRef(fs_id=x, puml_node=node_src),
-                            dst=PumlRef(fs_id=y, puml_node=node_dst),
+                            src=PumlRef(fs_id=fs_src, puml_node=node_src),
+                            dst=PumlRef(fs_id=fs_dst, puml_node=node_dst),
                         )
                     )
 

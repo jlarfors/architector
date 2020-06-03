@@ -25,7 +25,7 @@ class CodeNode:
     def __init__(self, cursor: Cursor):
         # self.id = str(cursor.get_usr())
         self.id = cursor.hash
-        self.file = str(cursor.location.file)
+        self.file = os.path.realpath(str(cursor.location.file))
         self.start_line = cursor.extent.start.line
         self.end_line = cursor.extent.end.line
         self.start_col = cursor.extent.start.column
@@ -96,7 +96,7 @@ class TUParser:
         # fs_id = next((fs.id for fs in self.fs_data.index.values() if os.path.samefile(node_path, fs.full_path)), None)
         fs = self.fs_data.file_index.get(os.path.abspath(node_path), None)
         # if fs_id is None:
-        #   raise Exception(f"Unable to get FileSystem ID from node_path {node_path}")
+        #     raise Exception(f"Unable to get FileSystem ID from node_path {node_path}")
         if fs:
             return fs.id
         return None
@@ -112,6 +112,7 @@ class TUParser:
                     f"File location not available for referenced cursor kind {cursor.referenced.kind}"
                 )
                 return
+            # set the node_dst by the referenced cursor
             node_dst = CodeNode(cursor.referenced)
             # logger.debug(f"Created destination CodeNode {node_dst}")
             fs_id_dst = self._get_cursor_fs_id(node_dst.file)
@@ -122,6 +123,11 @@ class TUParser:
                 # the file is probably outside of the working tree so we don't care
                 return
 
+        # check that filesystem IDs are not None
+        if fs_id_src is None or fs_id_dst is None:
+            raise Exception(
+                f"Filsyste IDs could not be retrieved for src node {node_src}. (src, dst) = {(fs_id_src, fs_id_dst)}"
+            )
         # create the code dependency
         self.deps.append(
             CodeDep(
@@ -168,10 +174,10 @@ class TUParser:
             self._code_dump(child, depth + 1)
 
     @log_with(logger=logger, name="Print Diagnostics")
-    def _print_diagnostics(self, diagnostics):
-        fail = False
+    def _print_diagnostics(self, diagnostics) -> bool:
+        fail: bool = False
         for diag in diagnostics:
-            # logger.warn(f"Severity: {diag.severity} - {diag}")
+            print(f"Severity: {diag.severity} - {diag}")
             if diag.severity > 3:
                 fail = True
         return fail
@@ -202,7 +208,7 @@ def handle_comp_cmd(
     tu_parser: TUParser,
     total_comp_cmds: int,
     index: int,
-    comp_cmd: List[CompCmd],
+    comp_cmd: CompCmd,
     code_dump: bool,
 ):
     return tu_parser.parse(total_comp_cmds, index, comp_cmd, code_dump)
@@ -217,6 +223,7 @@ class CodeParser:
     @log_with(logger=logger, name="Parsing C/C++ Project")
     def get_deps(self, compdb_file: str) -> List[CodeDep]:
         num_cores = multiprocessing.cpu_count()
+        # num_cores = 1
         # load the compilation database
         logger.debug(
             f"Creating compilation database from directory {compdb_file} using {num_cores} cores"
@@ -231,6 +238,10 @@ class CodeParser:
             "/Library/Developer/CommandLineTools/usr/lib/clang/11.0.0/include",
             "-isystem",
             "/Library/Developer/CommandLineTools/usr/include/c++/v1",
+            "-isystem",
+            "/Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk/usr/include",
+            "-isystem",
+            "/opt/llvm/lib/clang/9.0.1/include",
         ]
 
         comp_cmds = []

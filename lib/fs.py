@@ -1,6 +1,7 @@
-import os, typing
+import os
 
 from dataclasses import dataclass, field
+from typing import Dict, List
 from numba import jitclass, typeof
 
 from .counter import Counter
@@ -17,13 +18,13 @@ class FSEntry:
     name: str
     full_path: str
     is_dir: bool
-    children: typing.List["FSEntry"] = field(default_factory=lambda: [])
+    children: List["FSEntry"] = field(default_factory=lambda: [])
 
 
 @dataclass
 class FSData:
-    index: typing.Dict[int, FSEntry] = field(default_factory=lambda: {})
-    file_index: typing.Dict[str, FSEntry] = field(default_factory=lambda: {})
+    index: Dict[int, FSEntry] = field(default_factory=lambda: {})
+    file_index: Dict[str, FSEntry] = field(default_factory=lambda: {})
     root: FSEntry = None
 
     def _add_fs_entry(self, fs_entry: FSEntry, parent: FSEntry):
@@ -38,6 +39,15 @@ class FSData:
         fs_entry = FSEntry(id=id, name=name, full_path=full_path, is_dir=is_dir)
         self._add_fs_entry(fs_entry=fs_entry, parent=parent)
         return fs_entry
+
+    def get_desc_ids(self, id: int, desc: List[int]):
+        """
+        Given a Filesystem ID, return all the IDs of descendents
+        """
+        desc.append(id)
+        fs = self.index[id]
+        for entry in fs.children:
+            self.get_desc_ids(entry.id, desc)
 
     def get_full_path_by_id(self, id: int):
         return self.index[id].full_path
@@ -59,7 +69,7 @@ class FSScanner:
         self.counter = Counter()
         self.fs_data = FSData()
         self.file_extensions = (".c", ".cc", ".cpp", ".cxx", ".h", ".hpp")
-        self.excludes = ["/build"]
+        self.excludes = ["/build", ".git", "/tools/"]
 
     def _entry_filter(self, entry: os.DirEntry):
         return (
@@ -72,7 +82,7 @@ class FSScanner:
                 fs_entry = self.fs_data.add_fs_entry(
                     id=self.counter.get(),
                     name=entry.name,
-                    full_path=os.path.abspath(entry.path),
+                    full_path=os.path.realpath(entry.path),
                     is_dir=entry.is_dir(),
                     parent=parent,
                 )
